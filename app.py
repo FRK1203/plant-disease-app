@@ -1,29 +1,31 @@
 import streamlit as st
-import torch
-from torchvision import transforms, models
-import torch.nn as nn
+import onnxruntime as ort
 from PIL import Image
+import numpy as np
+from torchvision import transforms
 
-# ⚠️ 把这里的列表替换成你刚复制的那一串（保持顺序不变！）
-CLASS_NAMES =['rice_brown_spot', 'rice_healthy', 'rice_leaf_blast', 'tomato_bacterial_spot', 'tomato_early_blight', 'tomato_healthy', 'tomato_late_blight', 'tomato_leaf_mold', 'tomato_septoria_leaf_spot', 'tomato_spider_mites two-spotted_spider_mite', 'tomato_target_spot', 'tomato_tomato_mosaic_virus', 'tomato_tomato_yellow_leaf_curl_virus', 'wheat_brown_rust', 'wheat_healthy', 'wheat_yellow_rust']
-NUM_CLASSES = len(CLASS_NAMES)
+# 类别名（保持与本地训练顺序一致）
+CLASS_NAMES = [
+    'rice_brown_spot', 'rice_healthy', 'rice_leaf_blast',
+    'tomato_bacterial_spot', 'tomato_early_blight', 'tomato_healthy',
+    'tomato_late_blight', 'tomato_leaf_mold', 'tomato_septoria_leaf_spot',
+    'tomato_spider_mites_two-spotted_spider_mite', 'tomato_target_spot',
+    'tomato_tomato_mosaic_virus', 'tomato_tomato_yellow_leaf_curl_virus',
+    'wheat_brown_rust', 'wheat_healthy', 'wheat_yellow_rust'
+]
 
 st.set_page_config(page_title="植物叶片病害识别", page_icon="🌿")
 st.title("🌿 植物叶片疾病识别系统")
 st.write("上传一张叶片照片，自动诊断病害。")
 
+
 @st.cache_resource
 def load_model():
-    model = models.mobilenet_v3_large()
-    model.classifier[3] = nn.Sequential(
-        nn.Dropout(0.5),
-        nn.Linear(model.classifier[3].in_features, NUM_CLASSES)
-    )
-    model.load_state_dict(torch.load('plant_disease_model.pth', map_location='cpu'))
-    model.eval()
-    return model
+    return ort.InferenceSession("model.onnx")
 
-model = load_model()
+
+session = load_model()
+
 
 def preprocess(image):
     transform = transforms.Compose([
@@ -32,7 +34,8 @@ def preprocess(image):
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    return transform(image).unsqueeze(0)
+    return transform(image).unsqueeze(0).numpy()
+
 
 uploaded_file = st.file_uploader("选择一张叶片图片", type=["jpg", "jpeg", "png"])
 
@@ -40,13 +43,13 @@ if uploaded_file is not None:
     image = Image.open(uploaded_file).convert('RGB')
     st.image(image, caption="上传的叶片图片", width=300)
 
-    with torch.no_grad():
-        input_tensor = preprocess(image)
-        output = model(input_tensor)
-        prob = torch.softmax(output, dim=1).squeeze()
-        conf, pred_idx = torch.max(prob, 0)
+    input_array = preprocess(image)
+    outputs = session.run(["output"], {"input": input_array})
+    prob = np.exp(outputs[0]) / np.sum(np.exp(outputs[0]), axis=1, keepdims=True)
+    conf = float(np.max(prob))
+    pred_idx = int(np.argmax(prob))
+    pred_class = CLASS_NAMES[pred_idx]
 
-    pred_class = CLASS_NAMES[pred_idx.item()]
     st.success(f"**诊断结果：{pred_class}**")
     st.metric("置信度", f"{conf:.2%}")
 
