@@ -6,7 +6,6 @@ from PIL import Image
 
 # ⚠️ 把这里的列表替换成你刚复制的那一串（保持顺序不变！）
 CLASS_NAMES =['rice_brown_spot', 'rice_healthy', 'rice_leaf_blast', 'tomato_bacterial_spot', 'tomato_early_blight', 'tomato_healthy', 'tomato_late_blight', 'tomato_leaf_mold', 'tomato_septoria_leaf_spot', 'tomato_spider_mites two-spotted_spider_mite', 'tomato_target_spot', 'tomato_tomato_mosaic_virus', 'tomato_tomato_yellow_leaf_curl_virus', 'wheat_brown_rust', 'wheat_healthy', 'wheat_yellow_rust']
-
 NUM_CLASSES = len(CLASS_NAMES)
 
 st.set_page_config(page_title="植物叶片病害识别", page_icon="🌿")
